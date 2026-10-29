@@ -1,0 +1,665 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Risk Category Analytics Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: sticky top bar with breadcrumb + search; left system map; main view. Home = executive diagram as a clickable grid. */
+:root {
+  --bg: #F6F7F9; --surface: #FFFFFF; --sunk: #EEF1F5; --line: #D8DEE6;
+  --ink: #17233A; --muted: #56647A; --faint: #8693A6;
+  --navy: #1F3864; --navy-ink: #FFFFFF; --navy-soft: #E6ECF6;
+  --teal: #0E7C7B; --teal-soft: #E1F1F0;
+  --green: #2E7D32; --green-soft: #E7F3E7;
+  --amber: #B95A0C; --amber-soft: #FBEEDF;
+  --focus: #2F6FDB;
+  --display: "Barlow Semi Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0F1520; --surface: #161E2C; --sunk: #1C2636; --line: #2A3649;
+  --ink: #E7ECF4; --muted: #A3B0C3; --faint: #75839A;
+  --navy: #2C4E8A; --navy-ink: #FFFFFF; --navy-soft: #1D2A42;
+  --teal: #1F9A98; --teal-soft: #14302F;
+  --green: #45A04A; --green-soft: #18301A;
+  --amber: #E08A3C; --amber-soft: #33240F;
+  --focus: #7FA8F0; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0F1520; --surface: #161E2C; --sunk: #1C2636; --line: #2A3649;
+  --ink: #E7ECF4; --muted: #A3B0C3; --faint: #75839A;
+  --navy: #2C4E8A; --navy-ink: #FFFFFF; --navy-soft: #1D2A42;
+  --teal: #1F9A98; --teal-soft: #14302F;
+  --green: #45A04A; --green-soft: #18301A;
+  --amber: #E08A3C; --amber-soft: #33240F;
+  --focus: #7FA8F0; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* top bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.bar-in { max-width: 1320px; margin: 0 auto; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.brand { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: .02em; color: var(--navy); text-decoration: none; white-space: nowrap; }
+:root[data-theme="dark"] .brand { color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .brand { color: var(--ink); } }
+.crumbs { flex: 1 1 320px; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13.5px; color: var(--muted); }
+.crumbs a { text-decoration: none; padding: 2px 6px; border-radius: 6px; }
+.crumbs a:hover { background: var(--sunk); color: var(--ink); }
+.crumbs .sep { color: var(--faint); }
+.crumbs .cur { color: var(--ink); font-weight: 600; padding: 2px 6px; }
+.search { position: relative; flex: 0 1 300px; min-width: 200px; }
+.search input { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; font-size: 14px; }
+.results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.14); max-height: 60vh; overflow: auto; padding: 6px; }
+.results a { display: block; padding: 8px 10px; border-radius: 8px; text-decoration: none; }
+.results a:hover, .results a.on { background: var(--sunk); }
+.results small { color: var(--muted); display: block; font-size: 12px; }
+.mapbtn { display: none; border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+
+/* frame */
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px;
+  padding-block: 22px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+nav.tree { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 96px); overflow: auto; font-size: 13.5px; padding-right: 4px; }
+.tree h3 { font-family: var(--display); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin: 4px 0 8px; }
+.tree ul { list-style: none; margin: 0; padding-left: 12px; border-left: 1px solid var(--line); }
+.tree > ul { padding-left: 0; border: 0; }
+.tree li { margin: 1px 0; }
+.tree a { display: block; padding: 3px 8px; border-radius: 6px; text-decoration: none; color: var(--muted); }
+.tree a:hover { background: var(--sunk); color: var(--ink); }
+.tree a.on { background: var(--navy); color: var(--navy-ink); font-weight: 600; }
+.tree a.anc { color: var(--ink); font-weight: 600; }
+main { min-width: 0; }
+
+/* node header */
+.eyebrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--display); font-weight: 600; font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.lvl { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0; padding: 2px 7px; border-radius: 99px; background: var(--sunk); color: var(--muted); text-transform: none; }
+.code { font-family: var(--mono); font-size: 12px; letter-spacing: 0; padding: 2px 7px; border-radius: 6px; background: var(--navy-soft); color: var(--navy); text-transform: none; }
+:root[data-theme="dark"] .code { color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .code { color: var(--ink); } }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 3.4vw, 38px); line-height: 1.1; margin: 8px 0 8px; text-wrap: balance; }
+.lede { font-size: 17px; color: var(--muted); max-width: 70ch; margin: 0 0 18px; }
+.hint { font-size: 13px; color: var(--faint); }
+
+section.blk { margin-top: 26px; }
+section.blk > h2 { font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; display: flex; gap: 8px; align-items: baseline; }
+section.blk > h2 span { font-family: var(--body); text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); font-size: 13px; }
+
+/* facts */
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; min-width: 0; }
+.fact dt { font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: .08em; font-family: var(--display); font-weight: 600; }
+.fact dd { margin: 2px 0 0; font-weight: 500; }
+
+/* drill cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+a.card { display: flex; flex-direction: column; gap: 6px; text-decoration: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; min-width: 0; transition: border-color .15s, transform .15s, box-shadow .15s; }
+a.card:hover { border-color: var(--navy); box-shadow: 0 6px 18px rgba(23,35,58,.09); transform: translateY(-1px); }
+.card .k { font-family: var(--display); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); display: flex; justify-content: space-between; gap: 8px; }
+.card .t { font-family: var(--display); font-weight: 700; font-size: 18px; line-height: 1.2; }
+.card .s { color: var(--muted); font-size: 14px; }
+.card .more { margin-top: auto; font-size: 13px; color: var(--navy); font-weight: 600; }
+:root[data-theme="dark"] .card .more { color: var(--focus); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .card .more { color: var(--focus); } }
+.card.ai { border-top: 3px solid var(--teal); } .card.hu { border-top: 3px solid var(--green); } .card.gv { border-top: 3px solid var(--amber); }
+
+/* tables */
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.tbl + .tbl { margin-top: 14px; }
+.tbl caption { text-align: left; padding: 10px 14px 0; font-weight: 600; font-family: var(--display); font-size: 15px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--display); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--sunk); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; }
+td a.in, .prose a.in { color: var(--navy); font-weight: 600; text-decoration: none; border-bottom: 1px dotted currentColor; }
+:root[data-theme="dark"] td a.in, :root[data-theme="dark"] .prose a.in { color: var(--focus); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) td a.in, :root:not([data-theme="light"]) .prose a.in { color: var(--focus); } }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips a { text-decoration: none; border: 1px solid var(--line); background: var(--surface); padding: 5px 11px; border-radius: 99px; font-size: 13.5px; }
+.chips a:hover { border-color: var(--navy); }
+.chips a .code { margin-right: 6px; }
+ul.links { margin: 0; padding-left: 18px; }
+ul.links li { margin: 4px 0; }
+ul.links a { color: var(--navy); }
+:root[data-theme="dark"] ul.links a { color: var(--focus); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) ul.links a { color: var(--focus); } }
+.prose { max-width: 75ch; }
+.prose p { margin: 0 0 10px; }
+.note { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 14px; max-width: 80ch; }
+
+/* home diagram */
+.dia { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 3.6fr) minmax(150px, 1.2fr); gap: 18px; align-items: stretch; margin-top: 8px; }
+.col h4, .plat h4, .gov h4 { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 10px; }
+.col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col.src h4 { color: var(--navy); } .col.out h4 { color: var(--green); }
+:root[data-theme="dark"] .col.src h4 { color: var(--focus); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .col.src h4 { color: var(--focus); } }
+a.box { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; text-decoration: none; border-radius: var(--r); padding: 14px; min-height: 92px; border: 1.5px solid; transition: transform .15s, box-shadow .15s; position: relative; }
+a.box:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(23,35,58,.12); }
+a.box b { font-family: var(--display); font-size: 17px; line-height: 1.2; }
+a.box span { font-size: 13px; color: var(--muted); }
+a.box::after { content: "›"; position: absolute; right: 10px; top: 8px; font-size: 18px; color: var(--faint); }
+.src a.box { background: var(--navy-soft); border-color: var(--navy); }
+.out a.box { background: var(--green-soft); border-color: var(--green); }
+.plat { position: relative; background: var(--surface); border: 2px solid var(--navy); border-radius: 16px; padding: 16px 16px 14px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.plat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.plat-head > a { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; text-decoration: none; color: var(--navy); }
+:root[data-theme="dark"] .plat-head > a { color: var(--focus); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .plat-head > a { color: var(--focus); } }
+.plat-head > a:hover { text-decoration: underline; }
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; position: relative; }
+a.step { text-decoration: none; background: var(--navy); color: var(--navy-ink); border-radius: 12px; padding: 16px 12px 14px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 196px; position: relative; transition: transform .15s, box-shadow .15s; }
+a.step:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(23,35,58,.22); }
+a.step .n { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #FFFFFF; color: #1F3864; font-family: var(--display); font-weight: 700; font-size: 18px; }
+a.step b { font-family: var(--display); font-size: 21px; line-height: 1.1; margin-top: 4px; }
+a.step span { font-size: 13.5px; opacity: .85; }
+a.step em { font-style: normal; font-size: 11.5px; font-family: var(--mono); opacity: .75; margin-top: auto; }
+a.step.ai { background: var(--teal); }
+a.step.hu { background: var(--green-soft); color: var(--ink); border: 2px solid var(--green); }
+a.step.hu .n { background: var(--green); color: #FFFFFF; }
+a.step + a.step::before { content: ""; position: absolute; left: -19px; top: 50%; width: 16px; height: 2px; background: var(--faint); }
+a.step + a.step::after { content: ""; position: absolute; left: -7px; top: calc(50% - 4px); border: 5px solid transparent; border-left: 6px solid var(--faint); }
+.loop { display: flex; justify-content: center; }
+.loop a { font-size: 13.5px; color: var(--amber); font-style: italic; text-decoration: none; border: 1.5px dashed var(--amber); border-radius: 99px; padding: 5px 14px; background: var(--amber-soft); }
+.loop a:hover { font-weight: 600; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick a { font-size: 13px; text-decoration: none; border-radius: 99px; padding: 4px 11px; background: var(--sunk); color: var(--ink); }
+.quick a:hover { background: var(--navy-soft); }
+.gov { margin-top: 18px; }
+.gov h4 { color: var(--navy); text-align: center; }
+:root[data-theme="dark"] .gov h4 { color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .gov h4 { color: var(--ink); } }
+.govrow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--navy); border-radius: 12px; overflow: hidden; }
+.govrow a { text-decoration: none; color: var(--navy-ink); padding: 16px 12px; text-align: center; border-left: 1px solid rgba(255,255,255,.18); display: flex; flex-direction: column; gap: 2px; transition: background .15s; }
+.govrow a:first-child { border-left: 0; }
+.govrow a:hover { background: rgba(255,255,255,.1); }
+.govrow b { font-family: var(--display); font-size: 16px; }
+.govrow span { font-size: 13px; opacity: .85; }
+.legend { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+@media (max-width: 980px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  nav.tree { display: none; position: static; max-height: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; }
+  nav.tree.open { display: block; }
+  .mapbtn { display: inline-block; }
+  .dia { grid-template-columns: minmax(0, 1fr); }
+  .col { flex-direction: row; flex-wrap: wrap; } .col h4 { flex-basis: 100%; } .col a.box { flex: 1 1 160px; }
+}
+@media (max-width: 640px) {
+  .steps { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  a.step + a.step::before, a.step + a.step::after { display: none; }
+  .govrow { grid-template-columns: minmax(0, 1fr); }
+  .govrow a { border-left: 0; border-top: 1px solid rgba(255,255,255,.18); }
+  .search { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#home">Risk Category Analytics</a>
+    <button class="mapbtn" id="mapbtn" type="button" aria-expanded="false">System map</button>
+    <div class="crumbs" id="crumbs" aria-label="Breadcrumb"></div>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search: component, field, rule, ID…" autocomplete="off" aria-label="Search the architecture">
+      <div class="results" id="results" hidden></div>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+  <nav class="tree" id="tree" aria-label="System map"></nav>
+  <main id="view" tabindex="-1"></main>
+</div>
+
+<script>
+/* ===================== CONTENT MODEL =====================
+   Sources: US 313487 v2 (inputs and outputs) and US 313488 (architecture).
+   Each node: id, p (parent), k (kind), t (title), s (summary), and optional
+   code, facts [[label, value]], tables [{cap, cols, rows}], prose [..], rel [ids], links [[text, url]], note, cls.
+   In table cells and prose, [[id]] or [[id|text]] becomes an internal link. */
+const N = [];
+const add = (o) => N.push(o);
+
+/* ---------- Level 0 ---------- */
+add({ id: "home", t: "Global Risk Category Analytics", k: "Executive view",
+  s: "Turning thousands of safety reports into approved, traceable risk insight for SEWG. Click any box to go deeper." });
+
+/* ---------- Sources ---------- */
+add({ id: "src-public", p: "home", k: "Safety data", code: "I-1", t: "Public reports",
+  s: "Free government datasets that give the accident and incident history across the industry. Each source has one registered interface.",
+  facts: [["Input", "I-1 Safety report sources"], ["Protection", "P0 public"], ["Read by", "Step 1 Collect & clean"], ["Refresh", "Monthly to start"]],
+  rel: ["a1", "src-internal", "gov-protect"] });
+add({ id: "src-ntsb", p: "src-public", k: "Report source", t: "NTSB accident database",
+  s: "Investigated accidents and selected incidents. The primary source for accidents.",
+  facts: [["Role", "Primary accident source"], ["Use for rates", "Yes"], ["Refresh", "Monthly"], ["Access", "Free download (avall) or CAROL search"], ["Watch for", "Long narratives; accidents plus some incidents"]],
+  links: [["NTSB downloadable aviation datasets", "https://data.ntsb.gov/avdata/"], ["NTSB CAROL", "https://www.ntsb.gov/Pages/CAROL.aspx"]], rel: ["a4"] });
+add({ id: "src-aids", p: "src-public", k: "Report source", t: "FAA AIDS",
+  s: "FAA incident records. Used for incidents only; accidents come from NTSB so nothing is counted twice.",
+  facts: [["Role", "Incidents"], ["Use for rates", "To be confirmed (check current update status)"], ["Refresh", "Per ASIAS release"], ["Format", "Tab-delimited files"]],
+  links: [["FAA ASIAS – AIDS / NTSB data info", "https://asip.faa.gov/explore/ntsb/info"]], rel: ["a4"] });
+add({ id: "src-asrs", p: "src-public", k: "Report source", t: "NASA ASRS",
+  s: "Voluntary, mostly pilot reports. Rich in themes, but counts are a lower bound, not how often events happen.",
+  facts: [["Role", "Context and themes"], ["Use for rates", "No – shown as report counts only"], ["Refresh", "Monthly"], ["Limit", "10,000 records per export"]],
+  links: [["ASRS – About the data", "https://asrs.arc.nasa.gov/search/dbol/aboutdata.html"]], rel: ["da"] });
+add({ id: "src-sdrs", p: "src-public", k: "Report source", t: "FAA SDRS",
+  s: "Maintenance defect reports. Useful context for system and component failures; known to be incomplete.",
+  facts: [["Role", "Context for system failures"], ["Use for rates", "No"], ["Refresh", "Per release"]],
+  links: [["FAA SDRS query", "https://sdrs.faa.gov/Query.aspx"], ["GAO on SDRS data quality", "https://www.gao.gov/assets/rced-91-24.pdf"]] });
+add({ id: "src-internal", p: "home", k: "Safety data", code: "I-1", t: "Boeing internal safety reports",
+  s: "The main source for the Boeing fleet. Which systems, owners and terms apply is still to be confirmed by the data-source review.",
+  facts: [["Role", "Primary for Boeing fleet"], ["Use for rates", "Yes, once coverage is known"], ["Protection", "P1–P3 (internal to voluntary-protected)"], ["Status", "Sources to be named – decision D-4"]],
+  note: "Naming these sources with their owner, protection class and data-sharing terms is the main schedule risk. Build starts on public data while agreements land.",
+  rel: ["d-4", "gov-protect", "stage-4"] });
+add({ id: "src-fleet", p: "home", k: "Safety data", code: "I-4", t: "Fleet activity",
+  s: "Departures and flight hours by aircraft model, month and operator region. Turns event counts into rates.",
+  facts: [["Boeing models", "Boeing internal utilization data"], ["Other models", "Cirium (licence)"], ["Cross-check", "US BTS T-100 traffic data"], ["Revisions", "Stored as new versions; past rates restated"]],
+  links: [["BTS T-100 segment data", "https://www.transtats.bts.gov/DatabaseInfo.asp?QO_VQ=EEE"]],
+  rel: ["d-2", "da", "i-4"] });
+
+/* ---------- Step 1: Collect & clean (component A) ---------- */
+add({ id: "step-collect", p: "home", k: "Step 1 · Component A", t: "Collect & clean",
+  s: "Brings each registered source in, checks every record, maps source codes to CICTT and links reports to their events, so every event becomes one trusted record.",
+  facts: [["Takes in", "[[i-1|I-1 reports]], [[i-2|I-2 taxonomies]], [[i-8|I-8 code mappings]]"], ["Writes to", "[[zones|Raw and curated zone]]"], ["Produces", "[[o-7|O-7 data quality report]]"], ["Runs", "Every month, and in every release"]],
+  rel: ["gov-rhythm", "s2", "s6"] });
+add({ id: "a1", p: "step-collect", k: "Part", code: "A1", t: "Source connectors",
+  s: "One connector per registered source. A source that is not in the register is not read.",
+  tables: [{ cap: "Source register (one row per source)", cols: ["Field", "What it holds"], rows: [
+    ["Source ID", "Permanent ID used in every record"], ["Owner", "Who to contact about the data"], ["Access method and format", "Download, extract or file drop; CSV, JSON, PDF, HTML"],
+    ["Refresh and expected volume", "How often and how much"], ["Native ID field", "The source's own report number"], ["Protection class", "[[gov-protect|P0–P3]]"], ["Rate eligible", "Whether it can feed rates ([[da]])"]] }],
+  prose: ["Each load takes a dated snapshot with a checksum, so any output can be traced to the exact data it used. Raw values are stored unchanged."],
+  facts: [["Rules", "IN-1 register · IN-2 snapshots · IN-4 raw kept"]], rel: ["src-public", "src-internal", "zones"] });
+add({ id: "a2", p: "step-collect", k: "Part", code: "A2", t: "Schema check & quarantine",
+  s: "Every record is checked against its schema on the way in. Records that fail are set aside, counted and reported – never loaded.",
+  tables: [{ cap: "Checks", cols: ["Check", "What happens on failure"], rows: [
+    ["Schema (JSON Schema or Avro)", "Record quarantined; counted in [[o-7|O-7]]; source owner notified"], ["Code values against [[i-2|I-2]] lists", "Value quarantined (SC-3)"], ["Required fields: event date, source, narrative", "Must be at least 99% filled per source"]] }],
+  facts: [["Acceptance test", "100% of loaded records pass schema validation"], ["Rules", "IN-3 · SC-1 · SC-3"]], rel: ["o-7", "s6"] });
+add({ id: "a3", p: "step-collect", k: "Part", code: "A3", t: "Code mapping",
+  s: "Maps each source's own codes to CICTT occurrence category, phase of flight and aircraft make/model/series, using the versioned code mappings.",
+  facts: [["Uses", "[[i-8|I-8 code mappings]], [[i-2|I-2 reference taxonomies]]"], ["Keeps", "Raw value next to the mapped value (IN-4)"], ["Target", "At least 98% of aircraft mapped to a CICTT make/model/series"], ["Unmapped", "Listed in [[o-7|O-7]]"]],
+  rel: ["d1b", "d1c"] });
+add({ id: "a4", p: "step-collect", k: "Part", code: "A4", t: "Event linking",
+  s: "One event can have several reports and several aircraft. Records are split into event, report and aircraft, and linked, so the same event is never counted twice.",
+  prose: ["NTSB is the primary source for accidents; FAA AIDS is used for incidents only. Reports about the same event from different sources share one [[d1a|event ID]]."],
+  rel: ["d1a", "d1b", "d1c", "src-ntsb", "src-aids"] });
+const F = (rows) => ({ cap: "Fields", cols: ["Field", "Type", "Required", "Notes"], rows });
+add({ id: "d1a", p: "step-collect", k: "Data record", code: "D1a", t: "Event",
+  s: "One row per occurrence. Links all reports and aircraft about the same event.",
+  tables: [F([["event_id", "text", "Yes", "Links reports and aircraft of one event"], ["source_event_ref", "text", "No", "e.g. NTSB event number"], ["event_date", "date", "Yes", "Date of the occurrence"], ["event_time_utc", "time", "No", ""], ["location", "text", "No", "Country and airport ICAO code where known"], ["occurrence_class", "code", "No", "ICAO Annex 13: accident, serious incident, incident, unknown"], ["highest_injury", "code", "No", "Fatal, serious, minor, none"], ["investigation_status", "code", "No", "Preliminary or final"]])],
+  facts: [["Written by", "[[step-collect|A]]"], ["Zone", "[[zones|Curated]]"]], rel: ["d1b", "d1c", "a4"] });
+add({ id: "d1b", p: "step-collect", k: "Data record", code: "D1b", t: "Report",
+  s: "One row per report about an event, with the narrative text that the AI reads.",
+  tables: [F([["report_key", "text", "Yes", "source_id + source report number; unique"], ["source_id", "text", "Yes", "From the source register"], ["source_report_no", "text", "Yes", "The source's own number"], ["event_id", "text", "Yes", "Links to [[d1a|D1a]]"], ["report_type", "code", "Yes", "Investigation, mandatory or voluntary"], ["narrative", "text", "Yes", "Report text"], ["narrative_lang", "code", "Yes", "Language"], ["existing_codes_raw", "list", "No", "Codes as given by the source"], ["cictt_codes_mapped", "list", "No", "Same codes mapped with [[i-8|I-8]]"], ["protection_class", "code", "Yes", "[[gov-protect|P0–P3]]"], ["rate_eligible", "yes/no", "Yes", "From the source register"], ["snapshot_id, ingested_at, record_hash", "text", "Yes", "Traceability"]])],
+  facts: [["Written by", "[[step-collect|A]]"], ["Read by", "[[comp-b|B]], [[comp-c|C]]"]], rel: ["d1a", "c2"] });
+add({ id: "d1c", p: "step-collect", k: "Data record", code: "D1c", t: "Aircraft",
+  s: "One row per aircraft in an event, with its model and phase of flight in CICTT terms.",
+  tables: [F([["event_id, aircraft_seq", "text, number", "Yes", "One row per aircraft"], ["cictt_make, cictt_model, cictt_series", "code", "Yes", "CICTT make/model/series"], ["aircraft_model_raw", "text", "Yes", "As given by the source"], ["icao_type_designator", "code", "No", ""], ["aircraft_category", "code", "No", "Aeroplane, helicopter, …"], ["operation_type", "code", "No", "e.g. Part 121 / 135 / 91"], ["operator_region", "code", "No", ""], ["phase_of_flight_cictt, phase_of_flight_raw", "code, text", "No", "CICTT phase plus the source value"], ["damage", "code", "No", "Destroyed, substantial, minor, none (49 CFR 830.2)"], ["ata_chapters", "list", "No", "For system failures"]])],
+  rel: ["a3", "dc"] });
+add({ id: "o-7", p: "step-collect", k: "Output", code: "O-7", t: "Data quality report",
+  s: "Each run's results per ISO/IEC 25012 data quality dimension: records quarantined, duplicates linked, unmapped codes, late loads.",
+  facts: [["Used by", "Data owners, data science"], ["How often", "Every run"], ["Produced by", "[[a2|A2]] and [[s6|S6 monitoring]]"]], rel: ["a2", "a3"] });
+
+/* ---------- Step 2: Categorize (components B and C) ---------- */
+add({ id: "step-categorize", p: "home", k: "Step 2 · Components B and C", t: "Categorize", cls: "ai",
+  s: "AI groups similar reports, proposes risk categories under each CICTT category, and assigns every report to its categories with a confidence score. Nothing is final until experts approve it.",
+  facts: [["AI used", "Only through the [[s3|S3 model registry]]"], ["Quality gate", "[[c4|Accuracy gate]] must pass before review"], ["Writes to", "[[zones|Categories and Assignments zones]]"]],
+  rel: ["gov-ai", "loop"] });
+add({ id: "comp-b", p: "step-categorize", k: "Component", code: "B", t: "Find categories", cls: "ai",
+  s: "Proposes new or changed sub-categories under each CICTT Level 1 category, with definitions and example reports (US 311617 pipeline).",
+  facts: [["Takes in", "[[d1b|D1 records]], [[i-2|I-2]], [[i-6|I-6]], [[i-9|I-9]], [[i-10|I-10]], approved [[i-5|I-5]] decisions"], ["Writes", "Proposed [[d2|D2 category nodes]]"], ["Produces", "[[o-1|O-1]] after review · [[o-8|O-8]]"]] });
+add({ id: "b1", p: "comp-b", k: "Part", code: "B1", t: "Embeddings & clusters", cls: "ai",
+  s: "Each report narrative is turned into an embedding; reports are clustered within each CICTT category. The same embeddings power similar-report search.",
+  facts: [["Recorded", "Embedding model version ([[i-9|I-9]])"], ["Stored", "Search index in the [[zones|Categories zone]]"]] });
+add({ id: "b2", p: "comp-b", k: "Part", code: "B2", t: "AI category proposals", cls: "ai",
+  s: "An AI model reads samples from each cluster and proposes a name, definition, and inclusion and exclusion notes, in the style of the CICTT usage notes.",
+  facts: [["Status", "Every proposal stays \"proposed\" until SMEs approve"], ["Control", "[[gov-ai|AI-5: only approved models run]]"]], rel: ["step-review"] });
+add({ id: "b3", p: "comp-b", k: "Part", code: "B3", t: "Criteria cards", cls: "ai",
+  s: "Each proposal gets 3–5 typical and 1–2 borderline example reports, so experts see the evidence, not just a label.",
+  facts: [["Shown in", "[[o-5|O-5 review packs]]"]] });
+add({ id: "b4", p: "comp-b", k: "Part", code: "B4", t: "Release diff",
+  s: "Compares the proposed taxonomy with the last release and lists what changed.",
+  tables: [{ cap: "Version rules", cols: ["Change", "Version step"], rows: [["Structure change", "Major"], ["New sub-categories", "Minor"], ["Wording only", "Patch"]] }], rel: ["o-1"] });
+add({ id: "d2", p: "step-categorize", k: "Data record", code: "D2", t: "Category node",
+  s: "One row per category or sub-category, in every version. Level 1 is the CICTT category.",
+  tables: [F([["node_id, name, level, parent_id", "text, number", "Yes", "Permanent ID; level 1 = CICTT category"], ["cictt_code", "code", "Yes", "Primary CICTT anchor"], ["status", "code", "Yes", "Proposed, approved, retired"], ["definition, inclusion_notes, exclusion_notes", "text", "Yes", "Like the CICTT usage notes"], ["example_report_keys", "list", "Yes", "3–5 typical, 1–2 borderline"], ["g_hrc_flag", "yes/no", "Yes", "GASP priority category"], ["ercs_key_risk_area", "code", "No", "For comparison with EASA"], ["source_of_proposal", "text", "Yes", "SME or discovery run ID"], ["approved_by, approved_on", "text, date", "When approved", ""], ["version_introduced, version_retired, superseded_by", "text", "Yes / No", ""]])],
+  rel: ["comp-b", "o-1"] });
+add({ id: "comp-c", p: "step-categorize", k: "Component", code: "C", t: "Classify reports", cls: "ai",
+  s: "Links each report to one or more categories. Existing source codes are used first; AI handles the rest; accuracy is checked before anything goes to review.",
+  facts: [["Takes in", "[[d1b|D1]], [[d2|D2]], [[i-8|I-8]], [[i-9|I-9]], [[i-10|I-10]]"], ["Writes", "[[d3|D3 assignments]]"], ["Produces", "[[o-2|O-2]] · [[o-8|O-8]]"]] });
+add({ id: "c1", p: "comp-c", k: "Part", code: "C1", t: "Rules from source codes",
+  s: "Where a source already gives a CICTT code, directly or through the code mappings, it is used first. Rule version is recorded." , rel: ["i-8", "a3"] });
+add({ id: "c2", p: "comp-c", k: "Part", code: "C2", t: "AI classifier", cls: "ai",
+  s: "An AI model assigns the remaining reports and quotes the narrative text that supports each assignment. A report can have several categories; one is marked primary.",
+  facts: [["Evidence", "Stored as evidence_span in [[d3|D3]]"], ["Primary rule", "SME choice, else highest calibrated confidence"]] });
+add({ id: "c3", p: "comp-c", k: "Part", code: "C3", t: "Calibration", cls: "ai",
+  s: "Turns raw model scores into calibrated confidence (0–1) measured against the SME test sets. The method is recorded in the run manifest.",
+  facts: [["Used for", "Publishing threshold ([[gov-ai|AI-1]])"], ["Test sets", "[[i-10|I-10]]"]] });
+add({ id: "c4", p: "comp-c", k: "Part", code: "C4", t: "Accuracy gate", cls: "ai",
+  s: "Precision, recall and F1 per category against the SME-labelled test sets. If accuracy is below the agreed floor, the run stops before review.",
+  facts: [["Publishes", "[[o-8|O-8 AI accuracy report]]"], ["When", "Every release and whenever the model, prompt or categories change (AI-3)"], ["Floor", "Agreed per category by the Safety SME lead (open item)"]], rel: ["gov-rhythm"] });
+add({ id: "d3", p: "step-categorize", k: "Data record", code: "D3", t: "Assignment",
+  s: "One row per report–category link, with confidence, evidence and who made it.",
+  tables: [F([["report_key, node_id", "text", "Yes", "A report can have several nodes (CICTT is multi-label)"], ["is_primary", "yes/no", "Yes", "One per report"], ["confidence_calibrated", "number", "Yes", "0–1; method in the manifest"], ["evidence_span", "text", "No", "Narrative excerpt supporting the assignment"], ["assigned_by", "code", "Yes", "Model, rule or SME"], ["model_id, model_version, prompt_version", "text", "If model", "From [[i-9|I-9]]"], ["review_status, reviewer_id, reviewed_on, decision_id", "code, text, date", "Yes", "Auto, pending, approved, rejected"], ["taxonomy_version, run_id", "text", "Yes", ""]])],
+  rel: ["comp-c", "o-2"] });
+add({ id: "o-2", p: "comp-c", k: "Output", code: "O-2", t: "Report assignments",
+  s: "Each report linked to its categories with calibrated confidence, model version and evidence. Only SME-approved or above-threshold assignments are published.",
+  facts: [["Used by", "Analytics, data science"], ["Record", "[[d3|D3]]"], ["How often", "Every run"]] });
+add({ id: "o-8", p: "comp-c", k: "Output", code: "O-8", t: "AI accuracy report",
+  s: "Per category precision, recall and F1 against the test sets, calibration error, drift since the last run, and SME agreement rate.",
+  facts: [["Used by", "Data science, SMEs, audit"], ["Produced by", "[[c4|C4 accuracy gate]]"]] });
+
+/* ---------- Step 3: Expert review (E1, E2 + SMEs) ---------- */
+add({ id: "step-review", p: "home", k: "Step 3 · Component E", t: "Expert review", cls: "hu",
+  s: "Safety experts see each proposed change with its evidence and decide. Every decision is logged and feeds the next run.",
+  facts: [["Who", "Named safety SMEs only"], ["Where", "Review workspace – SharePoint list ([[da-4|DA-4]])"], ["Pack size", "About 25 categories per pack"], ["When", "Every quarterly release"]],
+  rel: ["gov-humans", "loop"] });
+add({ id: "e1", p: "step-review", k: "Part", code: "E1", t: "Review pack builder", cls: "hu",
+  s: "Builds packs of proposed changes, each with the model's evidence and criteria cards, for SMEs to review.", rel: ["o-5", "b3"] });
+add({ id: "i-5", p: "step-review", k: "Input", code: "I-5", t: "SME decisions", cls: "hu",
+  s: "Structured decisions captured in the review sheet – never by email or chat (IN-6).",
+  tables: [{ cap: "Decision types", cols: ["Decision", "Effect"], rows: [["Approve", "Category or assignment becomes approved and can be published"], ["Edit / rename", "Wording or name changed, then approved"], ["Merge / split", "Categories combined or divided"], ["Reject", "Stays in the decision log; never published"], ["Defer", "Waits for the next release"]] },
+    { cap: "Fields", cols: ["Field", "Notes"], rows: [["decision_id", "Unique"], ["item", "Category or assignment"], ["decision", "One of the types above"], ["rationale", "Why"], ["reviewer, date", "Who and when"], ["release_id", "Which release"]] }] });
+add({ id: "e2", p: "step-review", k: "Part", code: "E2", t: "Decision log", cls: "hu",
+  s: "Applies decisions, records them, and locks the taxonomy version for the release. Every change to a category or assignment links to a decision ID.",
+  rel: ["i-5", "o-5", "gov-trace"] });
+add({ id: "o-5", p: "step-review", k: "Output", code: "O-5", t: "Review packs and decision log",
+  s: "Proposed changes with evidence, and the full log of decisions. Excel or SharePoint list.",
+  facts: [["Used by", "Safety SMEs, audit"], ["Protection", "Can hold P1–P3; named SMEs only"]] });
+add({ id: "loop", p: "step-review", k: "Learning loop", t: "Expert decisions improve the AI", cls: "gv",
+  s: "Approved decisions shape the next run: categories are updated, new examples join the test sets, and the AI is re-checked whenever anything changes.",
+  tables: [{ cap: "How the loop works", cols: ["Step", "What happens"], rows: [["1", "SMEs approve, edit, merge or reject proposals ([[i-5|I-5]])"], ["2", "Approved decisions update the categories ([[d2|D2]]) used by [[comp-b|B]] and [[comp-c|C]]"], ["3", "SME-labelled reports extend the test sets ([[i-10|I-10]]), kept apart from prompt examples (AI-4)"], ["4", "Next run is re-evaluated at the [[c4|accuracy gate]] (AI-3)"]] }] });
+
+/* ---------- Step 4: Analyze (component D) ---------- */
+add({ id: "step-analyze", p: "home", k: "Step 4 · Component D", t: "Analyze",
+  s: "Turns approved assignments into counts, rates and trends by category, hides very small numbers, and builds the decomposition chart pack.",
+  facts: [["Takes in", "[[d3|D3]], [[i-3|I-3 priorities]], [[i-4|I-4 exposure]], [[i-7|I-7 requests]]"], ["Writes", "[[d4|D4 chart rows]]"], ["Produces", "[[o-3|O-3 charts]] · [[o-4|O-4 metrics]]"], ["Uses", "Approved data only (OUT-3)"]] });
+add({ id: "da", p: "step-analyze", k: "Part", code: "D-a", t: "Metric engine",
+  s: "Counts events and reports separately and works out rates with confidence intervals.",
+  tables: [{ cap: "Rate rules", cols: ["Rule", "Detail"], rows: [["Basis", "Per million departures; per 100,000 flight hours for time-driven categories such as turbulence ([[d-2|D-2]])"], ["Eligible sources", "Rates only from rate-eligible sources; ASRS and SDRS shown as counts (OUT-6)"], ["Every rate shows", "Basis, denominator source and version, data-through date, confidence interval (OUT-7)"], ["Revisions", "When exposure data is revised, past rates are restated and noted"]] }],
+  rel: ["src-fleet", "o-4"] });
+add({ id: "db", p: "step-analyze", k: "Part", code: "D-b", t: "Small-number rule",
+  s: "Hides very small cells (for example fewer than 3 events or operators) in anything shared, so protected data cannot be inferred.",
+  facts: [["Rule", "OUT-8"], ["Flag", "suppressed_flag in [[d4|D4]]"]], rel: ["gov-protect"] });
+add({ id: "dc", p: "step-analyze", k: "Part", code: "D-c", t: "Chart pack builder",
+  s: "Builds the SEWG decomposition charts for every Level 1 category.",
+  tables: [{ cap: "Charts per category", cols: ["Chart", "Shows"], rows: [["Tree or icicle", "The category hierarchy, e.g. RI → landing/takeoff on unintended surfaces"], ["Ranked bars", "Counts and rates by sub-category"], ["Small-multiple trends", "Change over time per sub-category"], ["Heat map", "Category × aircraft model or phase of flight"]] }],
+  facts: [["Tags", "GASP priority categories marked ([[i-3|I-3]])"], ["Format", "PNG/PDF plus the data ([[d4|D4]])"]], rel: ["o-3"] });
+add({ id: "d4", p: "step-analyze", k: "Data record", code: "D4", t: "Chart dataset row",
+  s: "One row per number in a chart.",
+  tables: [F([["release_id, taxonomy_version, node_id", "text", "Yes", ""], ["g_hrc_flag", "yes/no", "Yes", "GASP priority"], ["period, filters", "text", "Yes / No", "e.g. 2026-Q3; model, phase"], ["numerator_type", "code", "Yes", "Event or report"], ["event_count, report_count", "number", "Yes", "Kept apart"], ["exposure_value, unit, source, version", "number, code, text", "No", "Departures or flight hours"], ["rate, rate_basis", "number, code", "No", "Empty when not rate-eligible"], ["ci_low, ci_high", "number", "No", "Confidence interval, e.g. Poisson"], ["suppressed_flag", "yes/no", "Yes", "Small-number rule"], ["source_mix, data_through_date", "text, date", "Yes", ""]])] });
+
+/* ---------- Outcomes ---------- */
+add({ id: "o-3", p: "home", k: "Outcome · Output O-3", t: "Risk decomposition charts for SEWG",
+  s: "Per Level 1 category: hierarchy, ranked bars, trends and a heat map, with GASP priority categories tagged. Every chart shows its denominator source and data-through date.",
+  facts: [["Used by", "SEWG"], ["How often", "Every release and on request ([[i-7|I-7]])"], ["Built by", "[[dc|D-c chart pack builder]]"]], rel: ["d4", "i-3"] });
+add({ id: "o-4", p: "home", k: "Outcome · Output O-4", t: "Category metrics and trends",
+  s: "Event counts and report counts kept apart; rates only for rate-eligible sources, with confidence intervals; small cells hidden. Usable as safety performance indicators.",
+  facts: [["Used by", "SEWG, analysts, dashboards later"], ["Built by", "[[da|D-a metric engine]], [[db|D-b small-number rule]]"]], rel: ["d4", "d-2"] });
+add({ id: "out-releases", p: "home", k: "Outcome", t: "Versioned, auditable releases",
+  s: "Each quarterly release publishes the approved categories, its notes and manifest, and a lineage record for every run, so any number can be traced and any release rebuilt.",
+  facts: [["Published to", "Team share, after the release gate ([[gov-protect|SEC-5]])"], ["Formats", "Parquet or CSV, JSON, PDF, Markdown, plus Excel copies (OUT-5)"]] });
+add({ id: "o-1", p: "out-releases", k: "Output", code: "O-1", t: "Taxonomy release",
+  s: "Versioned category hierarchy with criteria cards and example reports, and a diff from the previous release.",
+  facts: [["Versioning", "[[b4|Major / minor / patch]]"], ["Contains", "Approved [[d2|D2]] nodes only (OUT-3)"], ["Formats", "JSON/CSV plus an Excel/PDF review copy"]] });
+add({ id: "o-6", p: "out-releases", k: "Output", code: "O-6", t: "Release notes and run manifest",
+  s: "What changed and migration notes; input snapshot IDs, taxonomy, mapping, model and prompt versions, configuration hash, code version and run ID.",
+  facts: [["Rules", "OUT-1 IDs on every output · OUT-4 rebuild from manifest"]], rel: ["gov-trace"] });
+add({ id: "o-9", p: "out-releases", k: "Output", code: "O-9", t: "Lineage records",
+  s: "One record per run: job, run ID, input datasets, output datasets and versions (OpenLineage style), so any number traces to its reports.",
+  facts: [["Written by", "[[s4|S4 lineage]]"], ["Test", "Any chart value traced to its report keys in under 5 minutes"]], rel: ["gov-trace"] });
+add({ id: "e3", p: "out-releases", k: "Part", code: "E3", t: "Release manager",
+  s: "Assembles the release: versions, notes and manifest." });
+add({ id: "e4", p: "out-releases", k: "Part", code: "E4", t: "Publisher",
+  s: "Copies the release to the published share only after the release gate passes: protection class checked, totals only, small numbers hidden." , rel: ["gov-protect"] });
+
+/* ---------- Governance foundation ---------- */
+add({ id: "gov-protect", p: "home", k: "Governance", t: "Protected data", cls: "gv",
+  s: "Every input and output carries a protection class. The platform enforces access by role, and only checked releases and review packs leave the protected environment.",
+  tables: [{ cap: "Protection classes", cols: ["Class", "Meaning", "Examples", "Handling"], rows: [["P0", "Public", "NTSB, ASRS, AIDS, SDRS", "Normal care"], ["P1", "Boeing internal", "Internal safety reports and analyses", "Boeing access controls"], ["P2", "Shared by operators", "Operator data under agreement", "Named access; agreement terms followed"], ["P3", "Voluntary-protected", "ASAP or FOQA content (14 CFR Part 193)", "Strict need-to-know; shared only aggregated and de-identified"]] },
+    { cap: "Rules", cols: ["ID", "Rule"], rows: [["DP-1", "Every input and output carries a class, set by the nature of the data (ICAO Annex 19 App. 3)"], ["DP-2", "An output takes the highest class of its inputs, unless aggregated and de-identified under the [[db|small-number rule]]"], ["DP-3", "Data is used only to maintain or improve safety"], ["DP-4", "Conditions on shared or voluntary data travel into every derived output"], ["DP-5", "Retention per source and agreement (to be confirmed)"], ["DP-6", "Information Security and Legal approve classes before first release"], ["SEC-1", "Everything runs in one protected environment approved for P1–P3"], ["SEC-2", "Encrypted at rest and in transit"], ["SEC-3", "Access by role and class ([[s5|S5]])"], ["SEC-5", "Release gate before the published share"], ["SEC-6", "Review packs only to named SMEs"], ["SEC-7", "Secrets in the company secret store"]] }],
+  links: [["14 CFR Part 193", "https://www.ecfr.gov/current/title-14/chapter-I/subchapter-K/part-193"], ["FAA Order 8000.82A (ASAP)", "https://www.faa.gov/documentLibrary/media/Order/8000_82A_FAA.pdf"], ["FAA Order 8000.81 (FOQA)", "https://www.faa.gov/documentLibrary/media/Order/8000.81_CHG_1.pdf"]] });
+add({ id: "gov-ai", p: "home", k: "Governance", t: "Approved AI only", cls: "gv",
+  s: "AI runs only through one registry and gateway, only with approved models, and only on a company-approved service that does not keep or train on the data.",
+  tables: [{ cap: "AI rules", cols: ["ID", "Rule"], rows: [["AI-1", "No assignment is published without SME approval or a calibrated confidence above the approved threshold"], ["AI-2", "Every assignment records model, model version, prompt version and evidence"], ["AI-3", "Re-evaluated against test sets whenever model, prompt or taxonomy changes ([[o-8|O-8]])"], ["AI-4", "Test sets kept separate from prompt examples"], ["AI-5", "Only models with an approved-use entry in [[i-9|I-9]] can run"], ["SEC-4", "All AI calls through the gateway ([[s3|S3]]), logged; provider does not train on or keep data"]] }],
+  prose: ["This is a ground-based analysis tool, not airborne software. Aviation AI guidance (EASA AI Concept Paper Issue 02) is used as good practice, with NIST AI RMF and ISO/IEC 42001."],
+  links: [["EASA AI Concept Paper Issue 2", "https://www.easa.europa.eu/en/document-library/general-publications/easa-artificial-intelligence-concept-paper-issue-2"], ["NIST AI RMF 1.0", "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf"]],
+  rel: ["c4", "s3", "da-3"] });
+add({ id: "gov-humans", p: "home", k: "Governance", t: "Humans decide", cls: "gv",
+  s: "Nothing reaches a published output without expert approval. AI proposes; safety experts decide; every decision is on record.",
+  tables: [{ cap: "Who signs off", cols: ["Role", "Agrees to"], rows: [["Story owner (data science)", "Inputs, outputs and architecture"], ["Architecture lead", "Records, schemas, interfaces"], ["SEWG representative", "Charts and metrics rules"], ["Safety SME lead", "Categories, accuracy floor"], ["Data owner(s)", "Source register, protection classes"], ["Information Security / Legal", "Protection classes and handling"]] }],
+  facts: [["Rule", "OUT-3: only SME-approved categories in published outputs"]], rel: ["step-review", "i-5", "loop"] });
+add({ id: "gov-trace", p: "home", k: "Governance", t: "Fully traceable", cls: "gv",
+  s: "Every number can be traced to the reports behind it, and any release can be rebuilt from its manifest.",
+  tables: [{ cap: "How traceability works", cols: ["Piece", "What it records"], rows: [["Snapshots ([[a1|A1]])", "Dated copy of each source with checksum"], ["Versions ([[s2|S2]])", "Taxonomies, mappings, models, settings, schemas"], ["Run manifest ([[o-6|O-6]])", "Every version and hash a release used"], ["Lineage ([[o-9|O-9]])", "Job → run → input and output datasets"], ["Decision log ([[e2|E2]])", "Every human change, with reviewer and reason"]] }],
+  facts: [["Tests", "Any value traced in under 5 minutes; re-run gives identical results within tolerance"]],
+  links: [["OpenLineage object model", "https://openlineage.io/docs/spec/object-model"]] });
+add({ id: "gov-rhythm", p: "home", k: "Governance", t: "Quarterly releases", cls: "gv",
+  s: "Data loads every month. A full, expert-reviewed release every quarter.",
+  tables: [{ cap: "One quarterly release", cols: ["Step", "Who", "What happens"], rows: [["1", "[[s1|S1 Scheduler]]", "Starts the run; run ID and manifest"], ["2", "[[step-collect|A]]", "Load snapshots, validate, map codes, link events"], ["3", "[[comp-b|B]]", "Propose new or changed categories"], ["4", "[[comp-c|C]]", "Classify; [[c4|accuracy gate]] – stop if it fails"], ["5", "[[e1|E]]", "Build review packs"], ["6", "Safety SMEs", "Approve, edit, merge, reject"], ["7", "[[e2|E]]", "Apply decisions; lock taxonomy version"], ["8", "[[step-analyze|D]]", "Metrics and charts on approved data only"], ["9", "[[e4|E]]", "Publish release, notes, lineage"]] },
+    { cap: "When something fails", cols: ["Failure", "What the system does"], rows: [["A source is late or fails checks", "Uses the last good snapshot; gap shown in [[o-7|O-7]]; owner alerted"], ["Accuracy gate fails", "Run stops before review; nothing new is shown or published"], ["SMEs do not finish", "Unreviewed items wait for the next release"], ["A step crashes", "Retried; re-run from its saved inputs"]] }],
+  rel: ["d-3"] });
+
+/* ---------- Platform & services ---------- */
+add({ id: "platform", p: "home", k: "Platform", t: "Secure analytics platform",
+  s: "One data platform with a zone per component, six shared services, and technology choices that are still open.",
+  rel: ["zones", "tech", "stages"] });
+add({ id: "zones", p: "platform", k: "Data platform", t: "Data zones",
+  s: "Versioned tables (Parquet). Each zone has one component that writes to it; E sets approval status in Categories and Assignments, always linked to a decision ID.",
+  tables: [{ cap: "Zones", cols: ["Zone", "Holds", "Writer", "Readers", "Protection"], rows: [["Raw", "Source snapshots as received; quarantine", "[[step-collect|A]]", "A", "Same as source"], ["Curated", "[[d1a|D1a]], [[d1b|D1b]], [[d1c|D1c]]", "A", "B, C, D", "Highest of its sources"], ["Categories", "[[d2|D2]], all versions; search index", "[[comp-b|B]] (E approvals)", "C, D, E", "P1"], ["Assignments", "[[d3|D3]]", "[[comp-c|C]] (E approvals)", "D, E", "Same as the report"], ["Metrics", "[[d4|D4]]", "[[step-analyze|D]]", "E", "P1; P0 once aggregated"], ["Releases", "[[o-1|O-1]], [[o-5|O-5]], [[o-6|O-6]]", "E", "All", "P1; packs P1–P3"], ["Lineage", "[[o-9|O-9]], run logs", "[[s4|S4]]", "Audit", "P1"]] }],
+  links: [["Medallion (raw, curated, published) pattern", "https://docs.databricks.com/en/lakehouse/medallion.html"]] });
+add({ id: "s1", p: "platform", k: "Shared service", code: "S1", t: "Scheduler", s: "Runs the steps in order on a schedule, issues a run ID, retries failed steps, stops on a failed gate.", rel: ["gov-rhythm", "da-2"] });
+add({ id: "s2", p: "platform", k: "Shared service", code: "S2", t: "Config and code repository", s: "Version control for code, settings ([[i-6|I-6]]), code mappings ([[i-8|I-8]]) and schemas. Records the configuration hash each run used.", facts: [["Supports", "IN-5, IN-7, SC-2"]] });
+add({ id: "s3", p: "platform", k: "Shared service", code: "S3", t: "Model and prompt registry, AI gateway", cls: "ai", s: "Lists approved models and prompt versions ([[i-9|I-9]]). All AI calls go through one gateway that checks approval and logs the call.", rel: ["gov-ai", "da-3"] });
+add({ id: "s4", p: "platform", k: "Shared service", code: "S4", t: "Lineage and manifest", s: "Writes one lineage record per run and the run manifest.", facts: [["Produces", "[[o-9|O-9]], [[o-6|O-6]]"], ["Supports", "OUT-1, OUT-2"]], rel: ["gov-trace"] });
+add({ id: "s5", p: "platform", k: "Shared service", code: "S5", t: "Access control", s: "Gives access by role and protection class; blocks protected data from shared outputs.", rel: ["gov-protect"] });
+add({ id: "s6", p: "platform", k: "Shared service", code: "S6", t: "Monitoring", s: "Logs, run status, data quality results ([[o-7|O-7]]) and alerts to owners." });
+add({ id: "tech", p: "platform", k: "Decisions", t: "Technology choices",
+  s: "The architecture is technology-neutral. The deciding factor is what the company already approves for protected data and AI." });
+const DA = [
+  ["da-1", "DA-1", "Data platform", "A. Company-approved lakehouse (e.g. Databricks or Snowflake) · B. Relational database plus file store · C. Files on a team share", "A, if approved for P1–P3: versioned tables, access control and lineage built in. B as fallback. C only for a short P0 pilot"],
+  ["da-2", "DA-2", "Scheduler", "Platform's own job scheduler · Apache Airflow · simple scheduled script", "The platform's own scheduler, to avoid running another service"],
+  ["da-3", "DA-3", "AI model service", "Company-approved hosted service · model hosted inside the environment", "The approved service if its terms meet SEC-4; keep the gateway so the model can be swapped"],
+  ["da-4", "DA-4", "Review workspace", "SharePoint list · Excel review sheet · small web app", "SharePoint list: structured, access-controlled, nothing new to support"],
+  ["da-5", "DA-5", "Charts and dashboards", "Python chart pack (PDF/HTML) · company BI tool", "Python chart pack first; BI tool once D4 is stable for two releases"],
+  ["da-6", "DA-6", "Search for similar reports", "Platform's built-in vector search · separate vector database", "Built-in if available: one less system to secure"]];
+DA.forEach(([id, code, t, opts, rec]) => add({ id, p: "tech", k: "Decision", code, t, s: rec, facts: [["Options", opts], ["Recommendation", rec], ["Status", "Open – see [[decisions|open items]]"]] }));
+add({ id: "stages", p: "platform", k: "Plan", t: "Build in stages",
+  s: "Start on public data, add AI and review, then rates and charts, then internal sources.",
+  tables: [{ cap: "Stages", cols: ["Stage", "What is built", "What you get"], rows: [["[[stage-1|1 Foundation]]", "Data platform, S1, S2, S4, S5; A with public sources; D with counts", "First counts by CICTT category"], ["[[stage-2|2 Categories]]", "B and C with S3, accuracy gate, review workspace", "First approved category release"], ["[[stage-3|3 Rates and charts]]", "Exposure data, rates, small-number rule, chart pack", "SEWG chart pack"], ["[[stage-4|4 Internal sources]]", "Boeing internal source connectors once named and agreed", "Full scope"]] }] });
+[["stage-1", "Stage 1 – Foundation", "Data platform zones and shared services S1, S2, S4, S5; component A with public sources (NTSB, ASRS, AIDS, SDRS); component D with counts only. Delivers O-7, O-9 and first counts by CICTT category."],
+ ["stage-2", "Stage 2 – Categories", "Components B and C with the AI registry (S3), the accuracy gate and the review workspace; the first SME review round. Delivers O-1, O-2, O-5, O-6, O-8."],
+ ["stage-3", "Stage 3 – Rates and charts", "Fleet exposure data, rates, the small-number rule and the decomposition chart pack. Delivers O-3 and O-4."],
+ ["stage-4", "Stage 4 – Internal sources", "Connectors for Boeing internal sources once named and agreed (D-4); dashboards if wanted. Full scope."]]
+  .forEach(([id, t, s]) => add({ id, p: "stages", k: "Stage", t, s }));
+
+/* ---------- Inputs & outputs catalog ---------- */
+add({ id: "io", p: "home", k: "Catalog", t: "All inputs and outputs",
+  s: "The ten inputs and nine outputs agreed in US 313487. Every one has a place in the architecture.",
+  tables: [{ cap: "Inputs", cols: ["ID", "Input", "Provided by", "Priority"], rows: [
+    ["[[i-1|I-1]]", "Safety report sources", "Data owner per source", "Must"], ["[[i-2|I-2]]", "Reference taxonomies", "Data science team", "Must"], ["[[i-3|I-3]]", "Priority references", "SEWG lead", "Must"], ["[[i-4|I-4]]", "Fleet exposure data", "Boeing fleet data; Cirium", "Should"], ["[[i-5|I-5]]", "SME review decisions", "Safety SMEs", "Must"], ["[[i-6|I-6]]", "Configuration", "Data science team", "Must"], ["[[i-7|I-7]]", "Analysis requests", "SEWG, analysts", "Should"], ["[[i-8|I-8]]", "Code mappings", "Data science, SMEs", "Must"], ["[[i-9|I-9]]", "Model and prompt registry", "Data science team", "Must"], ["[[i-10|I-10]]", "Labelled test sets", "Safety SMEs", "Must"]] },
+   { cap: "Outputs", cols: ["ID", "Output", "Used by", "Produced in"], rows: [
+    ["[[o-1|O-1]]", "Taxonomy release", "All consumers", "B, E"], ["[[o-2|O-2]]", "Report assignments", "Analytics, data science", "C"], ["[[o-3|O-3]]", "Decomposition charts", "SEWG", "D"], ["[[o-4|O-4]]", "Category metrics", "SEWG, analysts", "D"], ["[[o-5|O-5]]", "Review packs and decision log", "SMEs, audit", "E"], ["[[o-6|O-6]]", "Release notes and manifest", "All, audit", "E, S4"], ["[[o-7|O-7]]", "Data quality report", "Data owners", "A, S6"], ["[[o-8|O-8]]", "AI accuracy report", "Data science, SMEs", "C"], ["[[o-9|O-9]]", "Lineage records", "Audit", "S4"]] }] });
+add({ id: "i-1", p: "io", k: "Input", code: "I-1", t: "Safety report sources", s: "Report records with narrative text, one interface per registered source.", rel: ["src-public", "src-internal", "a1"] });
+add({ id: "i-2", p: "io", k: "Input", code: "I-2", t: "Reference taxonomies", s: "CICTT occurrence categories (v4.8 to be confirmed), phase of flight and make/model/series; ICAO Annex 13 classes; 49 CFR 830.2 damage levels; ADREP events; ATA chapters; HFACS; EASA key risk areas (optional). Each stored with publisher, version and date.",
+  links: [["CICTT occurrence categories v4.7 (ICAO copy)", "https://www.icao.int/sites/default/files/APAC/Meetings/2024/2024%20NASP%20Workshop/Supporting%20Documents/CAST-ICAO-Taxonomy-Occurrences.pdf"], ["CICTT phase of flight (NTSB copy)", "https://www.ntsb.gov/safety/data/Documents/datafiles/PhaseofFlightDefinitions.pdf"]], rel: ["a3", "comp-b"] });
+add({ id: "i-3", p: "io", k: "Input", code: "I-3", t: "Priority references", s: "ICAO GASP 2026–2028 high-risk categories (CFIT, LOC-I, MAC, RE, RI) and other global risk categories (ARC, SCF-NP, TURB); CAST safety enhancements; the SEWG priority list. Edition recorded so charts show \"priority as of\".",
+  links: [["ICAO GASP 2026–2028 (Doc 10004)", "https://www.icao.int/sites/default/files/safety/GASP/Documents/Doc.10004.2026-2028.GASP_.EN_.pdf"]], rel: ["dc"] });
+add({ id: "i-4", p: "io", k: "Input", code: "I-4", t: "Fleet exposure data", s: "Departures and flight hours by aircraft model, month and operator region; source, version and as-of date.", rel: ["src-fleet", "da"] });
+add({ id: "i-6", p: "io", k: "Input", code: "I-6", t: "Configuration", s: "In-scope categories, confidence thresholds, minimum counts for rates, mapping and model versions, source list. Version-controlled; every run records its hash (IN-7).", rel: ["s2"] });
+add({ id: "i-7", p: "io", k: "Input", code: "I-7", t: "Analysis requests", s: "Template: question, category, filters (model, phase), period, requester, sensitivity.", rel: ["step-analyze"] });
+add({ id: "i-8", p: "io", k: "Input", code: "I-8", t: "Code mappings", s: "Mappings from each source's own codes to CICTT category, phase of flight and make/model/series, plus ATA chapter clean-up. Versioned and SME-approved.", rel: ["a3", "c1", "s2"] });
+add({ id: "i-9", p: "io", k: "Input", code: "I-9", t: "Model and prompt registry", s: "Model ID and version, provider, prompt template version, settings, approved-use statement.", rel: ["s3", "gov-ai"] });
+add({ id: "i-10", p: "io", k: "Input", code: "I-10", t: "Labelled test sets", s: "SME-labelled \"gold\" reports per category, used to measure and calibrate B and C. Versioned and kept apart from prompt examples.", rel: ["c3", "c4", "loop"] });
+
+/* ---------- Decisions & research ---------- */
+add({ id: "decisions", p: "home", k: "Decisions", t: "Open decisions and items",
+  s: "What the team still has to decide before and during the build.",
+  tables: [{ cap: "Spec decisions (US 313487)", cols: ["ID", "Decision", "Recommendation"], rows: [["[[d-1|D-1]]", "How outputs are delivered", "Versioned files on the team share; dashboard later"], ["[[d-2|D-2]]", "Exposure source and rate basis", "Per million departures; per 100,000 flight hours for turbulence; Boeing data for Boeing models, Cirium for others"], ["[[d-3|D-3]]", "Refresh cadence", "Monthly loads; quarterly reviewed releases"], ["[[d-4|D-4]]", "Internal sources for the first release", "Name each with owner, class and terms before build"]] },
+   { cap: "Technology decisions (US 313488)", cols: ["ID", "Choice", "Recommendation"], rows: DA.map(([id, code, t, , rec]) => [`[[${id}|${code}]]`, t, rec]) },
+   { cap: "Open items", cols: ["Item", "Owner", "Needed by"], rows: [["Choose data platform and confirm P1–P3 approval (DA-1)", "Platform / IT owner", "Before stage 1"], ["Confirm AI model service and terms (DA-3)", "Story owner, InfoSec", "Before stage 2"], ["Name internal report sources (D-4)", "Data owners", "Before stage 4"], ["InfoSec and Legal review of protection classes", "Story owner", "Before first release"], ["Agree AI accuracy floor per category", "Safety SME lead", "Before stage 2"], ["Expected report volume and retention", "Data owners", "Before stage 1"], ["Confirm CICTT v4.8 against the official PDF", "Story owner", "Before first release"]] }] });
+[["d-1", "D-1", "How outputs are delivered", "Options: versioned files on the team share · database tables · dashboard feed.", "Parquet with CSV extracts and a PDF/HTML chart pack per release. Add a dashboard once formats are stable for two releases."],
+ ["d-2", "D-2", "Exposure source and rate basis", "Options: internal fleet data · Cirium · BTS T-100 · counts only.", "Rate per million departures (as the Boeing Statistical Summary and ICAO use); per 100,000 flight hours only for time-driven categories such as turbulence. Boeing data for Boeing models, Cirium for others, T-100 as a US cross-check. Restate past rates when exposure is revised."],
+ ["d-3", "D-3", "Refresh cadence", "Options: monthly · quarterly · on demand.", "Monthly loads; quarterly taxonomy and metric releases after SME review; ad hoc analysis runs not published."],
+ ["d-4", "D-4", "Internal sources for the first release", "From the data-source review.", "Name each source with its owner, protection class and data-sharing terms before build. This is the main schedule risk."]]
+  .forEach(([id, code, t, opts, rec]) => add({ id, p: "decisions", k: "Decision", code, t, s: rec, facts: [["Options", opts.replace("Options: ", "")], ["Recommendation", rec]] }));
+add({ id: "research", p: "home", k: "Sources", t: "Research sources",
+  s: "Key references behind the design. The full list of 54 sources with download links is in the Research Sources document.",
+  links: [["ICAO Safety Report 2026", "https://www.icao.int/sites/default/files/sp-files/safety/Documents/ICAO_SR_2026.pdf"], ["ICAO GASP 2026–2028", "https://www.icao.int/sites/default/files/safety/GASP/Documents/Doc.10004.2026-2028.GASP_.EN_.pdf"], ["CICTT occurrence categories (ICAO copy)", "https://www.icao.int/sites/default/files/APAC/Meetings/2024/2024%20NASP%20Workshop/Supporting%20Documents/CAST-ICAO-Taxonomy-Occurrences.pdf"], ["Boeing Statistical Summary", "https://www.boeing.com/content/dam/boeing/v2/safety/statsum.pdf"], ["EASA Data4Safety", "https://www.easa.europa.eu/domains/safety-management/data4safety"], ["IATA IDX", "https://www.iata.org/en/services/data/safety/gadm/idx"], ["ECCAIRS taxonomy browser", "https://aviationreporting.eu/en/taxonomy-browser"], ["TnT-LLM (KDD 2024)", "https://dl.acm.org/doi/pdf/10.1145/3637528.3671647"], ["Clio (2024)", "https://arxiv.org/pdf/2412.13678"], ["OpenLineage object model", "https://openlineage.io/docs/spec/object-model"], ["C4 model", "https://c4model.com/"], ["NIST AI RMF 1.0", "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf"]] });
+
+/* ===================== ENGINE ===================== */
+const byId = Object.fromEntries(N.map(n => [n.id, n]));
+const kids = {};
+N.forEach(n => { if (n.p) (kids[n.p] = kids[n.p] || []).push(n.id); });
+const pathTo = (id) => { const out = []; let n = byId[id]; while (n) { out.unshift(n); n = byId[n.p]; } return out; };
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const linkify = (s) => esc(s).replace(/\[\[([a-z0-9-]+)(?:\|([^\]]+))?\]\]/g, (m, id, label) =>
+  byId[id] ? `<a class="in" href="#${id}">${label || byId[id].t}</a>` : (label || id));
+const plain = (s) => String(s || "").replace(/\[\[([a-z0-9-]+)(?:\|([^\]]+))?\]\]/g, (m, id, l) => l || (byId[id] ? byId[id].t : id));
+const descendants = (id) => (kids[id] || []).reduce((a, k) => a + 1 + descendants(k), 0);
+
+function card(id) {
+  const n = byId[id], d = descendants(id);
+  return `<a class="card ${n.cls || ""}" href="#${id}">
+    <span class="k"><span>${esc(n.k)}</span>${n.code ? `<span class="code">${esc(n.code)}</span>` : ""}</span>
+    <span class="t">${esc(n.t)}</span>
+    <span class="s">${esc(plain(n.s))}</span>
+    <span class="more">${d ? `Open · ${d} item${d > 1 ? "s" : ""} inside ›` : "Open ›"}</span></a>`;
+}
+function table(t) {
+  return `<div class="tbl"><table>${t.cap ? `<caption>${esc(t.cap)}</caption>` : ""}
+    <thead><tr>${t.cols.map(c => `<th scope="col">${esc(c)}</th>`).join("")}</tr></thead>
+    <tbody>${t.rows.map(r => `<tr>${r.map((c, i) => `<td${t.cols[0] === "Field" && i === 0 ? ' class="mono"' : ""}>${linkify(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function renderHome() {
+  const box = (id, sub) => `<a class="box" href="#${id}"><b>${esc(byId[id].t)}</b><span>${esc(sub)}</span></a>`;
+  const step = (id, n, sub, cls) => `<a class="step ${cls || ""}" href="#${id}"><span class="n">${n}</span><b>${esc(byId[id].t)}</b><span>${esc(sub)}</span><em>${descendants(id)} details</em></a>`;
+  const gov = (id, sub) => `<a href="#${id}"><b>${esc(byId[id].t)}</b><span>${esc(sub)}</span></a>`;
+  return `
+  <div class="eyebrow">Executive view <span class="lvl">Level 0</span></div>
+  <h1>Global Risk Category Analytics</h1>
+  <p class="lede">Turning thousands of safety reports into approved, traceable risk insight for SEWG. Every box opens; keep clicking to reach components, data fields and rules.</p>
+  <div class="dia">
+    <div class="col src"><h4>Safety data</h4>
+      ${box("src-public", "NTSB · FAA · NASA")}${box("src-internal", "protected, role-based")}${box("src-fleet", "flights and hours")}
+    </div>
+    <div class="plat">
+      <div class="plat-head"><a href="#platform">Secure analytics platform ›</a>
+        <div class="quick"><a href="#zones">Data zones</a><a href="#s1">Shared services</a><a href="#tech">Technology choices</a><a href="#stages">Build stages</a></div></div>
+      <div class="steps">
+        ${step("step-collect", 1, "one trusted record per event")}
+        ${step("step-categorize", 2, "AI suggests risk categories", "ai")}
+        ${step("step-review", 3, "safety experts approve changes", "hu")}
+        ${step("step-analyze", 4, "counts, rates, trends by category")}
+      </div>
+      <div class="loop"><a href="#loop">↺ expert decisions improve the AI</a></div>
+    </div>
+    <div class="col out"><h4>Outcomes</h4>
+      ${box("o-3", "charts for SEWG")}${box("o-4", "counts, rates, trends")}${box("out-releases", "audit-ready")}
+    </div>
+  </div>
+  <div class="gov"><h4>Governance foundation</h4>
+    <div class="govrow">
+      ${gov("gov-protect", "access by role")}${gov("gov-ai", "no data retention")}${gov("gov-humans", "nothing published unreviewed")}${gov("gov-trace", "every number to its reports")}${gov("gov-rhythm", "monthly data refresh")}
+    </div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--navy)"></i>Automated step</span>
+    <span><i style="background:var(--teal)"></i>AI-assisted</span>
+    <span><i style="background:var(--green)"></i>Human decision</span>
+    <span><i style="background:var(--amber)"></i>Governance</span>
+  </div>
+  <section class="blk"><h2>Also explore</h2>
+    <div class="chips"><a href="#io">All inputs and outputs</a><a href="#decisions">Open decisions</a><a href="#research">Research sources</a><a href="#d1b">Example: the report record</a><a href="#c4">Example: the AI accuracy gate</a></div>
+  </section>`;
+}
+
+function renderNode(n) {
+  const depth = pathTo(n.id).length - 1;
+  const ch = kids[n.id] || [];
+  let h = `<div class="eyebrow">${esc(n.k)} ${n.code ? `<span class="code">${esc(n.code)}</span>` : ""}<span class="lvl">Level ${depth}</span></div>
+    <h1>${esc(n.t)}</h1><p class="lede">${linkify(n.s)}</p>`;
+  if (n.facts) h += `<dl class="facts">${n.facts.map(([a, b]) => `<div class="fact"><dt>${esc(a)}</dt><dd>${linkify(b)}</dd></div>`).join("")}</dl>`;
+  if (n.note) h += `<section class="blk"><div class="note">${linkify(n.note)}</div></section>`;
+  if (ch.length) h += `<section class="blk"><h2>Go deeper <span>${ch.length} item${ch.length > 1 ? "s" : ""}</span></h2><div class="cards">${ch.map(card).join("")}</div></section>`;
+  if (n.prose) h += `<section class="blk prose">${n.prose.map(p => `<p>${linkify(p)}</p>`).join("")}</section>`;
+  if (n.tables) h += `<section class="blk"><h2>Detail</h2>${n.tables.map(table).join("")}</section>`;
+  if (n.rel && n.rel.length) h += `<section class="blk"><h2>Related</h2><div class="chips">${n.rel.filter(r => byId[r]).map(r => `<a href="#${r}">${byId[r].code ? `<span class="code">${esc(byId[r].code)}</span>` : ""}${esc(byId[r].t)}</a>`).join("")}</div></section>`;
+  if (n.links) h += `<section class="blk"><h2>Sources</h2><ul class="links">${n.links.map(([t, u]) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join("")}</ul></section>`;
+  if (!ch.length) h += `<p class="hint" style="margin-top:28px">This is the deepest level for this item. Use the breadcrumb or the related links to keep exploring.</p>`;
+  return h;
+}
+
+function renderTree(cur) {
+  const open = new Set(pathTo(cur).map(n => n.id));
+  const li = (id) => {
+    const n = byId[id], c = kids[id] || [];
+    const cls = id === cur ? "on" : (open.has(id) ? "anc" : "");
+    return `<li><a class="${cls}" href="#${id}">${n.code ? n.code + " · " : ""}${esc(n.t)}</a>${c.length && open.has(id) ? `<ul>${c.map(li).join("")}</ul>` : ""}</li>`;
+  };
+  document.getElementById("tree").innerHTML = `<h3>System map</h3><ul>${li("home")}</ul>`;
+  if (cur === "home") {
+    document.getElementById("tree").innerHTML = `<h3>System map</h3><ul><li><a class="on" href="#home">Executive view</a><ul>${(kids.home || []).map(li).join("")}</ul></li></ul>`;
+  }
+}
+
+function render() {
+  let id = (location.hash || "#home").slice(1);
+  if (!byId[id]) id = "home";
+  const n = byId[id];
+  document.getElementById("view").innerHTML = id === "home" ? renderHome() : renderNode(n);
+  const path = pathTo(id);
+  document.getElementById("crumbs").innerHTML = path.map((p, i) => i === path.length - 1
+    ? `<span class="cur">${esc(i === 0 ? "Executive view" : p.t)}</span>`
+    : `<a href="#${p.id}">${esc(i === 0 ? "Executive view" : p.t)}</a><span class="sep">›</span>`).join("");
+  renderTree(id);
+  document.getElementById("tree").classList.remove("open");
+  document.getElementById("mapbtn").setAttribute("aria-expanded", "false");
+  window.scrollTo({ top: 0 });
+  document.title = id === "home" ? "Risk Category Analytics Explorer" : `${n.t} · Risk Category Analytics Explorer`;
+}
+window.addEventListener("hashchange", render);
+
+/* search */
+const q = document.getElementById("q"), res = document.getElementById("results");
+const index = N.map(n => ({ id: n.id, hay: [n.t, n.k, n.code, plain(n.s), ...(n.tables || []).flatMap(t => t.rows.map(r => r.map(plain).join(" ")))].join(" ").toLowerCase() }));
+let sel = 0, hits = [];
+function search() {
+  const term = q.value.trim().toLowerCase();
+  if (term.length < 2) { res.hidden = true; return; }
+  const words = term.split(/\s+/);
+  hits = index.filter(x => words.every(w => x.hay.includes(w)))
+    .sort((a, b) => (byId[b.id].t.toLowerCase().includes(term) - byId[a.id].t.toLowerCase().includes(term))).slice(0, 12);
+  sel = 0;
+  res.innerHTML = hits.length ? hits.map((x, i) => { const n = byId[x.id];
+    return `<a href="#${n.id}" class="${i === 0 ? "on" : ""}">${n.code ? `<span class="code">${esc(n.code)}</span> ` : ""}${esc(n.t)}<small>${esc(n.k)} · ${esc(pathTo(n.id).slice(1, -1).map(p => p.t).join(" › ") || "Executive view")}</small></a>`; }).join("")
+    : `<div class="hint" style="padding:8px 10px">No match. Try an ID like I-4, a field like event_id, or a word like rates.</div>`;
+  res.hidden = false;
+}
+q.addEventListener("input", search);
+q.addEventListener("keydown", (e) => {
+  const links = [...res.querySelectorAll("a")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); if (!links.length) return;
+    sel = (sel + (e.key === "ArrowDown" ? 1 : links.length - 1)) % links.length; links.forEach((l, i) => l.classList.toggle("on", i === sel)); }
+  if (e.key === "Enter" && links[sel]) { location.hash = links[sel].getAttribute("href"); q.value = ""; res.hidden = true; }
+  if (e.key === "Escape") { res.hidden = true; }
+});
+res.addEventListener("click", () => { q.value = ""; res.hidden = true; });
+document.addEventListener("click", (e) => { if (!e.target.closest(".search")) res.hidden = true; });
+document.getElementById("mapbtn").addEventListener("click", (e) => {
+  const t = document.getElementById("tree"); const open = t.classList.toggle("open");
+  e.currentTarget.setAttribute("aria-expanded", String(open));
+});
+render();
+</script>
+
+</body></html>
